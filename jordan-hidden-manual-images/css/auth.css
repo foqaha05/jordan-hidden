@@ -1,0 +1,45 @@
+body:not(.site-ready) #hd,
+body:not(.site-ready) #app { display:none !important; }
+.auth-shell[hidden] { display:none !important; }
+.auth-shell { position:fixed; inset:0; z-index:1000; overflow:auto; min-height:100vh; display:grid; place-items:center; padding:30px 16px; background:rgba(20,16,13,.85); backdrop-filter:blur(6px); }
+.auth-card { position:relative; width:min(100%,440px); padding:36px; border:1px solid var(--border-medium); border-radius:var(--radius-xl); background:rgba(36,29,24,.98); box-shadow:var(--shadow-card); text-align:center; }
+.auth-close { position:absolute; top:14px; right:18px; border:0; background:transparent; color:var(--sand); cursor:pointer; font-size:30px; line-height:1; }
+.auth-close:hover,.auth-close:focus-visible { color:var(--cream); }
+.auth-logo { width:112px; height:112px; object-fit:contain; border-radius:50%; margin-bottom:18px; }
+.auth-card h1 { font-size:35px; margin:8px 0; }
+.auth-subtitle { color:var(--sand); margin-bottom:25px; }
+.auth-card form { display:grid; gap:14px; text-align:left; }
+.auth-card label { display:grid; gap:6px; font-size:13px; font-weight:600; color:var(--sand); }
+.auth-card [hidden] { display:none !important; }
+.auth-card input:not([type="checkbox"]) { width:100%; border-radius:var(--radius-sm); border:1px solid var(--border-strong); background:rgba(255,255,255,.06); color:var(--cream); padding:12px 14px; font:inherit; outline:none; }
+.auth-card select { width:100%; border-radius:var(--radius-sm); border:1px solid var(--border-strong); background:#302620; color:var(--cream); padding:12px 14px; font:inherit; }
+.auth-card input:focus { border-color:var(--gold); }
+.auth-card input::placeholder { color:rgba(216,197,163,.55); }
+.auth-card .import-row { display:flex; align-items:flex-start; font-weight:400; line-height:1.4; }
+.auth-card .import-row input { accent-color:var(--gold); margin-top:3px; }
+.auth-card #auth-submit { width:100%; margin-top:8px; }
+.auth-card #auth-submit:disabled { opacity:.55; cursor:wait; }
+.auth-switch { margin-top:22px; color:var(--sand); font-size:13px; }
+.auth-switch button { color:var(--gold); background:none; padding:0; font-weight:700; text-decoration:underline; }
+.auth-error { color:#ffd4c8; background:rgba(168,92,74,.25); border:1px solid var(--rose); border-radius:var(--radius-sm); padding:10px 12px; font-size:13px; }
+.username-label { font-size:12px; color:var(--cream); max-width:125px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.logout-button { font-size:12px; color:var(--sand); padding:7px 9px; border:1px solid var(--border-medium); background:transparent; border-radius:var(--radius-pill); }
+.logout-button:hover { color:var(--cream); border-color:var(--gold); }
+.guest-feature-notice,.community-preview-notice{margin-bottom:24px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.guest-feature-notice .btn,.community-preview-notice .btn{margin-left:auto}
+.community-preview-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
+.community-preview-grid p{color:var(--sand);margin-top:10px}
+body.site-ready:not(.figma-static) #hd{flex-wrap:wrap}
+body.site-ready:not(.figma-static) #hd nav{order:3;width:100%;margin:0;display:flex;justify-content:center;flex-wrap:wrap;overflow:visible}
+@media(max-width:1000px){.username-label{display:none}.logout-button{white-space:nowrap}}
+@media(max-width:680px){.auth-card{padding:26px}.auth-card h1{font-size:30px}.logout-button{order:3}}
+@media(max-width:680px){
+  body.site-ready:not(.figma-static) #hd{flex-wrap:wrap;gap:8px;padding:10px 16px}
+  body.site-ready:not(.figma-static) #hd .brand{flex:1;min-width:90px}
+  body.site-ready:not(.figma-static) #hd .logout-button{order:2;white-space:nowrap}
+  body.site-ready:not(.figma-static) #hd nav{order:3;width:100%;margin:0;overflow:visible;justify-content:center;flex-wrap:wrap}
+  body.site-ready:not(.figma-static) #hd nav button{padding:8px 10px;white-space:nowrap}
+  body.site-ready:not(.figma-static) #hd .profile-avatar,
+  body.site-ready:not(.figma-static) #hd .team-logo{display:none}
+  .community-preview-grid{grid-template-columns:1fr}
+}

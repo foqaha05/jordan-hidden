@@ -1,0 +1,16 @@
+/* Animations: separated from layout. Static Figma state = same page with these removed (body.figma-static). */
+@keyframes fi{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+@keyframes pu{from{opacity:.7;transform:scale(1)}to{opacity:0;transform:scale(3)}}
+@keyframes pop{from{transform:scale(.6);opacity:0}}
+@keyframes tp{0%{transform:translateY(30px);opacity:0}15%,80%{transform:none;opacity:1}100%{opacity:0;transform:translateY(-20px)}}
+@keyframes fl{50%{transform:translateY(-10px)}}
+@keyframes sn{to{transform:rotate(360deg)}}
+#app{animation:fi .5s ease}
+.marker-pulse{animation:pu 2.2s infinite}
+.modal{animation:fi .3s}
+.modal-box{animation:pop .6s cubic-bezier(.2,1.4,.4,1)}
+.toast{animation:tp 2s forwards}
+.splash img{animation:fl 4s ease-in-out infinite}
+.spin{animation:sn 1s linear infinite}
+@media(prefers-reduced-motion:reduce){*{animation:none!important}}
+body.figma-static *,body.figma-static *::before,body.figma-static *::after{animation:none!important;transition:none!important}

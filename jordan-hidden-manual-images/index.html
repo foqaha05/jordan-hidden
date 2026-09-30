@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Jordan Hidden: The Quest</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%A7%AD%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/animations.css">
+<link rel="stylesheet" href="css/auth.css">
+<link rel="stylesheet" href="css/community.css">
+</head>
+<body>
+<section id="auth-root" class="auth-shell" aria-label="Account access" role="dialog" aria-modal="true" hidden>
+  <div class="auth-card">
+    <button id="auth-close" class="auth-close" type="button" aria-label="Continue exploring without signing in">×</button>
+    <img src="assets/logo.webp" alt="Jordan Hidden" class="auth-logo">
+    <div class="eyebrow">THE QUEST BEGINS</div>
+    <h1 id="auth-title">Welcome back</h1>
+    <p class="auth-subtitle">Sign in to continue your Jordan journey.</p>
+    <form id="auth-form">
+      <label class="signup-only" hidden>Username <input id="auth-username" autocomplete="username" minlength="3" maxlength="24" pattern="[A-Za-z0-9_]{3,24}" placeholder="Choose a unique username"></label>
+      <label class="signup-only" hidden>What is your purpose?
+        <select id="auth-role">
+          <option value="" selected disabled>Choose your purpose</option>
+          <option value="tourist">Tourist / Service Seeker</option>
+          <option value="visitor">Entertainment / Visitor</option>
+          <option value="provider">Service Provider</option>
+        </select>
+      </label>
+      <label>Email <input id="auth-email" type="email" autocomplete="email" required placeholder="you@example.com"></label>
+      <label>Password <input id="auth-password" type="password" autocomplete="current-password" minlength="6" required placeholder="Your password"></label>
+      <label class="signup-only" hidden>Confirm password <input id="auth-confirm" type="password" autocomplete="new-password" placeholder="Repeat your password"></label>
+      <label class="signup-only import-row" id="import-row" hidden><input id="auth-import" type="checkbox"> Import the progress previously saved on this browser</label>
+      <p id="auth-error" class="auth-error" role="alert" aria-live="polite" hidden></p>
+      <button id="auth-submit" class="btn" type="submit">Log in</button>
+    </form>
+    <form id="auth-role-form" hidden>
+      <p class="auth-subtitle">Choose how you want to use Jordan Hidden to continue with your existing account.</p>
+      <label>What is your purpose?
+        <select id="existing-role" required>
+          <option value="" selected disabled>Choose your purpose</option>
+          <option value="tourist">Tourist / Service Seeker</option>
+          <option value="visitor">Entertainment / Visitor</option>
+          <option value="provider">Service Provider</option>
+        </select>
+      </label>
+      <button class="btn" type="submit">Continue</button>
+    </form>
+    <p class="auth-switch"><span id="auth-switch-prompt">New to Jordan Hidden?</span> <button id="auth-toggle" type="button">Create an account</button></p>
+  </div>
+</section>
+<header id="hd"></header>
+<main id="app"></main>
+<script src="js/firebase-config.js"></script>
+<script src="js/script.js"></script>
+<script src="js/community-ui.js"></script>
+<script src="js/community-questions.js"></script>
+<script src="js/community.js"></script>
+<script type="module" src="js/auth.js"></script>
+</body>
+</html>

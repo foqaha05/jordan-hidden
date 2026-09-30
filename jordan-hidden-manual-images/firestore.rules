@@ -1,0 +1,339 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function userPath(uid) {
+      return /databases/$(database)/documents/users/$(uid);
+    }
+
+    function namePath(lower) {
+      return /databases/$(database)/documents/usernames/$(lower);
+    }
+
+    function adminPath(uid) {
+      return /databases/$(database)/documents/admins/$(uid);
+    }
+
+    function isAdmin() {
+      return signedIn() && exists(adminPath(request.auth.uid));
+    }
+
+    function userHasRole(role) {
+      return signedIn()
+        && exists(userPath(request.auth.uid))
+        && get(userPath(request.auth.uid)).data.role == role;
+    }
+
+    function validRole(role) {
+      return role is string && role in ['tourist', 'visitor', 'provider'];
+    }
+
+    function isTouristOrVisitor() {
+      return userHasRole('tourist') || userHasRole('visitor');
+    }
+
+    function validReviewStatus(status) {
+      return status in ['pending', 'approved', 'rejected', 'needs_changes'];
+    }
+
+    function validName(name, lower) {
+      return name is string
+        && name.matches('^[A-Za-z0-9_]{3,24}$')
+        && lower is string
+        && lower == name.lower();
+    }
+
+    // Images are added manually as HTTPS links. No Firebase Storage is used.
+    function validPhotoUrls(urls) {
+      return urls is list
+        && urls.size() > 0
+        && urls.size() <= 4
+        && urls[0] is string
+        && urls[0].matches('^https://.*')
+        && (urls.size() < 2 || (urls[1] is string && urls[1].matches('^https://.*')))
+        && (urls.size() < 3 || (urls[2] is string && urls[2].matches('^https://.*')))
+        && (urls.size() < 4 || (urls[3] is string && urls[3].matches('^https://.*')));
+    }
+
+    match /usernames/{normalized} {
+      allow get: if signedIn();
+      allow list: if false;
+      allow create: if signedIn()
+        && normalized.matches('^[a-z0-9_]{3,24}$')
+        && request.resource.data.keys().hasOnly(['uid', 'username', 'usernameLower'])
+        && request.resource.data.keys().hasAll(['uid', 'username', 'usernameLower'])
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.usernameLower == normalized
+        && validName(request.resource.data.username, normalized)
+        && getAfter(userPath(request.auth.uid)).data.username == request.resource.data.username
+        && getAfter(userPath(request.auth.uid)).data.usernameLower == normalized;
+      allow update, delete: if false;
+    }
+
+    match /users/{uid} {
+      allow get: if signedIn() && request.auth.uid == uid;
+      allow list: if false;
+      allow create: if signedIn()
+        && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(['username', 'usernameLower', 'progress', 'createdAt', 'role'])
+        && request.resource.data.keys().hasAll(['username', 'usernameLower', 'progress', 'createdAt', 'role'])
+        && validName(request.resource.data.username, request.resource.data.usernameLower)
+        && validRole(request.resource.data.role)
+        && request.resource.data.progress is map
+        && getAfter(namePath(request.resource.data.usernameLower)).data.uid == uid
+        && getAfter(namePath(request.resource.data.usernameLower)).data.username == request.resource.data.username;
+
+      allow update: if signedIn()
+        && request.auth.uid == uid
+        && request.resource.data.username == resource.data.username
+        && request.resource.data.usernameLower == resource.data.usernameLower
+        && request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['progress', 'updatedAt', 'role'])
+        && request.resource.data.progress is map
+        && (
+          (resource.data.keys().hasAny(['role']) && request.resource.data.role == resource.data.role)
+          || (!resource.data.keys().hasAny(['role'])
+            && (!request.resource.data.keys().hasAny(['role']) || validRole(request.resource.data.role)))
+        );
+      allow delete: if false;
+    }
+
+    // Admin membership is created manually in Firestore Console/Admin SDK.
+    match /admins/{uid} {
+      allow get: if signedIn() && request.auth.uid == uid;
+      allow list: if false;
+      allow create, update, delete: if false;
+    }
+
+    match /serviceRequests/{requestId} {
+      allow get, list: if isAdmin()
+        || (signedIn() && resource.data.ownerUid == request.auth.uid);
+
+      allow create: if userHasRole('provider')
+        && request.resource.data.ownerUid == request.auth.uid
+        && request.resource.data.status == 'pending'
+        && request.resource.data.keys().hasOnly([
+          'ownerUid', 'username', 'status', 'name', 'description', 'location',
+          'type', 'availability', 'contact', 'additional', 'photos', 'createdAt'
+        ])
+        && request.resource.data.keys().hasAll([
+          'ownerUid', 'username', 'status', 'name', 'description', 'location',
+          'type', 'availability', 'contact', 'photos', 'createdAt'
+        ])
+        && validPhotoUrls(request.resource.data.photos);
+
+      allow update: if (
+        (isAdmin()
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'adminNote'])
+          && request.resource.data.ownerUid == resource.data.ownerUid
+          && request.resource.data.status in ['pending', 'approved', 'rejected', 'needs_changes']
+          && (!request.resource.data.keys().hasAny(['adminNote'])
+            || request.resource.data.adminNote == null
+            || (request.resource.data.adminNote is string && request.resource.data.adminNote.size() <= 4000)))
+        ||
+        (userHasRole('provider')
+          && resource.data.ownerUid == request.auth.uid
+          && resource.data.status == 'needs_changes'
+          && request.resource.data.status == 'pending'
+          && request.resource.data.ownerUid == resource.data.ownerUid
+          && request.resource.data.username == resource.data.username
+          && request.resource.data.createdAt == resource.data.createdAt
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'name', 'description', 'location', 'type', 'availability', 'contact',
+            'additional', 'photos', 'status'
+          ])
+          && validPhotoUrls(request.resource.data.photos))
+      );
+      allow delete: if false;
+    }
+
+    match /approvedServices/{serviceId} {
+      allow get, list: if resource.data.status == 'approved';
+      allow create: if isAdmin()
+        && request.resource.data.status == 'approved'
+        && validPhotoUrls(request.resource.data.photos);
+      allow update: if isAdmin()
+        && request.resource.data.status == 'approved'
+        && validPhotoUrls(request.resource.data.photos);
+      allow delete: if isAdmin();
+    }
+
+    match /restaurants/{restaurantId} {
+      allow get, list: if isAdmin() || resource.data.status == 'approved';
+      allow create: if isAdmin()
+        && request.resource.data.status in ['pending', 'approved', 'rejected', 'needs_changes']
+        && validPhotoUrls(request.resource.data.photos)
+        && request.resource.data.lat is number
+        && request.resource.data.lng is number
+        && request.resource.data.lat >= -90
+        && request.resource.data.lat <= 90
+        && request.resource.data.lng >= -180
+        && request.resource.data.lng <= 180;
+      allow update: if isAdmin()
+        && request.resource.data.status in ['pending', 'approved', 'rejected', 'needs_changes']
+        && validPhotoUrls(request.resource.data.photos)
+        && request.resource.data.lat is number
+        && request.resource.data.lng is number
+        && request.resource.data.lat >= -90
+        && request.resource.data.lat <= 90
+        && request.resource.data.lng >= -180
+        && request.resource.data.lng <= 180;
+      allow delete: if isAdmin();
+    }
+
+    match /journeys/{journeyId} {
+      allow get: if isTouristOrVisitor()
+        && (resource == null || resource.data.ownerUid == request.auth.uid);
+      allow list: if isTouristOrVisitor()
+        && resource.data.ownerUid == request.auth.uid;
+      allow create: if isTouristOrVisitor()
+        && request.resource.data.ownerUid == request.auth.uid;
+      allow update: if isTouristOrVisitor()
+        && resource.data.ownerUid == request.auth.uid
+        && request.resource.data.ownerUid == resource.data.ownerUid;
+      allow delete: if isAdmin()
+        || (isTouristOrVisitor() && resource.data.ownerUid == request.auth.uid);
+    }
+
+    match /journeyQuestions/{questionId} {
+      allow get, list: if isAdmin() || (signedIn() && resource.data.status == 'approved');
+      allow create, update, delete: if isAdmin();
+    }
+
+    match /journeyAnswers/{answerId} {
+      allow get: if isAdmin()
+        || (signedIn() && answerId.matches('^' + request.auth.uid + '_.*'));
+      allow list: if isAdmin()
+        || (signedIn() && resource.data.ownerUid == request.auth.uid);
+
+      allow create: if isTouristOrVisitor()
+        && request.resource.data.ownerUid == request.auth.uid
+        && request.resource.data.keys().hasAll([
+          'ownerUid', 'journeyId', 'questionId', 'destination',
+          'choice', 'correct', 'awardedXP', 'answeredAt'
+        ])
+        && request.resource.data.journeyId is string
+        && request.resource.data.questionId is string
+        && answerId == request.auth.uid + '_' + request.resource.data.journeyId
+          + '_' + request.resource.data.questionId
+        && exists(/databases/$(database)/documents/journeys/$(request.resource.data.journeyId))
+        && get(/databases/$(database)/documents/journeys/$(request.resource.data.journeyId)).data.ownerUid == request.auth.uid
+        && get(/databases/$(database)/documents/journeys/$(request.resource.data.journeyId)).data.destination == request.resource.data.destination
+        && exists(/databases/$(database)/documents/journeyQuestions/$(request.resource.data.questionId))
+        && get(/databases/$(database)/documents/journeyQuestions/$(request.resource.data.questionId)).data.status == 'approved'
+        && get(/databases/$(database)/documents/journeyQuestions/$(request.resource.data.questionId)).data.destination
+          == get(/databases/$(database)/documents/journeys/$(request.resource.data.journeyId)).data.destination
+        && get(/databases/$(database)/documents/journeyQuestions/$(request.resource.data.questionId)).data.options is list
+        && request.resource.data.choice is int
+        && request.resource.data.choice >= 0
+        && request.resource.data.choice
+          < get(/databases/$(database)/documents/journeyQuestions/$(request.resource.data.questionId)).data.options.size()
+        && get(/databases/$(database)/documents/journeyQuestions/$(request.resource.data.questionId)).data.correctIndex is int
+        && get(/databases/$(database)/documents/journeyQuestions/$(request.resource.data.questionId)).data.correctIndex >= 0
+        && get(/databases/$(database)/documents/journeyQuestions/$(request.resource.data.questionId)).data.correctIndex
+          < get(/databases/$(database)/documents/journeyQuestions/$(request.resource.data.questionId)).data.options.size()
+        && request.resource.data.correct is bool
+        && request.resource.data.correct
+          == (request.resource.data.choice
+            == get(/databases/$(database)/documents/journeyQuestions/$(request.resource.data.questionId)).data.correctIndex)
+        && get(/databases/$(database)/documents/journeyQuestions/$(request.resource.data.questionId)).data.xp is int
+        && request.resource.data.awardedXP is int
+        && request.resource.data.awardedXP
+          == (request.resource.data.correct
+            ? get(/databases/$(database)/documents/journeyQuestions/$(request.resource.data.questionId)).data.xp
+            : 0);
+      allow update, delete: if false;
+    }
+
+    match /touristPhotos/{photoId} {
+      allow get, list: if isAdmin()
+        || (signedIn() && resource.data.ownerUid == request.auth.uid);
+      allow create: if isTouristOrVisitor()
+        && request.resource.data.ownerUid == request.auth.uid
+        && request.resource.data.keys().hasOnly([
+          'ownerUid', 'journeyId', 'destination', 'imageUrl', 'createdAt'
+        ])
+        && request.resource.data.keys().hasAll([
+          'ownerUid', 'journeyId', 'destination', 'imageUrl', 'createdAt'
+        ])
+        && request.resource.data.imageUrl is string
+        && request.resource.data.imageUrl.matches('^https://.*')
+        && exists(/databases/$(database)/documents/journeys/$(request.resource.data.journeyId))
+        && get(/databases/$(database)/documents/journeys/$(request.resource.data.journeyId)).data.ownerUid == request.auth.uid
+        && request.resource.data.destination
+          == get(/databases/$(database)/documents/journeys/$(request.resource.data.journeyId)).data.destination;
+      allow update: if false;
+      allow delete: if isAdmin()
+        || (isTouristOrVisitor() && resource.data.ownerUid == request.auth.uid);
+    }
+
+    match /reviews/{reviewId} {
+      allow get, list: if isAdmin()
+        || (signedIn() && resource.data.ownerUid == request.auth.uid);
+      allow create: if isTouristOrVisitor()
+        && request.resource.data.ownerUid == request.auth.uid
+        && request.resource.data.status == 'pending'
+        && request.resource.data.keys().hasAll(['ownerUid', 'status', 'journeyId'])
+        && request.resource.data.journeyId is string
+        && reviewId == request.auth.uid + '_' + request.resource.data.journeyId
+        && exists(/databases/$(database)/documents/journeys/$(request.resource.data.journeyId))
+        && get(/databases/$(database)/documents/journeys/$(request.resource.data.journeyId)).data.ownerUid == request.auth.uid
+        && get(/databases/$(database)/documents/journeys/$(request.resource.data.journeyId)).data.status == 'completed'
+        && request.resource.data.destination
+          == get(/databases/$(database)/documents/journeys/$(request.resource.data.journeyId)).data.destination;
+      allow update: if isAdmin()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status'])
+        && request.resource.data.ownerUid == resource.data.ownerUid
+        && validReviewStatus(request.resource.data.status);
+      allow delete: if false;
+    }
+
+    match /feedback/{feedbackId} {
+      allow get, list: if isAdmin()
+        || (signedIn() && resource.data.ownerUid == request.auth.uid);
+      allow create: if isTouristOrVisitor()
+        && request.resource.data.ownerUid == request.auth.uid
+        && request.resource.data.status == 'pending'
+        && request.resource.data.keys().hasAll(['ownerUid', 'status', 'journeyId'])
+        && request.resource.data.journeyId is string
+        && feedbackId == request.auth.uid + '_' + request.resource.data.journeyId
+        && exists(/databases/$(database)/documents/journeys/$(request.resource.data.journeyId))
+        && get(/databases/$(database)/documents/journeys/$(request.resource.data.journeyId)).data.ownerUid == request.auth.uid
+        && get(/databases/$(database)/documents/journeys/$(request.resource.data.journeyId)).data.status == 'completed'
+        && request.resource.data.destination
+          == get(/databases/$(database)/documents/journeys/$(request.resource.data.journeyId)).data.destination;
+      allow update: if isAdmin()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status'])
+        && request.resource.data.ownerUid == resource.data.ownerUid
+        && request.resource.data.journeyId == resource.data.journeyId
+        && request.resource.data.status in ['reviewed', 'hidden', 'pending'];
+      allow delete: if false;
+    }
+
+    match /reports/{reportId} {
+      allow get, list: if isAdmin();
+      allow create: if signedIn()
+        && request.resource.data.ownerUid == request.auth.uid
+        && request.resource.data.keys().hasOnly([
+          'ownerUid', 'username', 'targetId', 'reason', 'status', 'createdAt'
+        ])
+        && request.resource.data.keys().hasAll([
+          'ownerUid', 'username', 'targetId', 'reason', 'status', 'createdAt'
+        ])
+        && request.resource.data.status == 'pending'
+        && request.resource.data.reason is string
+        && request.resource.data.reason.size() > 0
+        && request.resource.data.reason.size() <= 1000;
+      allow update: if isAdmin()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status'])
+        && request.resource.data.ownerUid == resource.data.ownerUid
+        && request.resource.data.status in ['resolved', 'dismissed', 'pending'];
+      allow delete: if false;
+    }
+  }
+}
